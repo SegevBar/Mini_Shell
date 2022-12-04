@@ -16,7 +16,7 @@ void sigint_default_handler();
 pid_t my_fork();
 void my_execvp(char** arglist);
 int my_pipe(int pipefd[]);
-void my_dup2(int pipefd[], int i);
+void my_dup2(int pipefd_i, int i);
 int fork_and_execute(int count, char** arglist);
 int execute_command_in_background(int count, char** arglist);
 int find_pipe_symbol(char** arglist);
@@ -189,8 +189,8 @@ int my_pipe(int pipefd[]) {
 /*
 * A fiunction that execute dup2 and checks for errors
 */
-void my_dup2(int pipefd[], int i) {
-    int dup2_res = dup2(pipefd[i], i);
+void my_dup2(int pipefd_i, int i) {
+    int dup2_res = dup2(pipefd_i, i);
     
     if(dup2_res == -1) {
         perror("Failed executing dup2");
@@ -257,7 +257,7 @@ int execute_pipig_two_processes(int count, char** arglist, int pipe_symbol) {
         /* first child */
         sigint_default_handler();  /* Foreground child terminate upon SIGINT */
         close(pipefd[0]);  /* close read side */
-        my_dup2(pipefd, 1);
+        my_dup2(pipefd[1], 1);
         close(pipefd[1]);
         my_execvp(first_cmd);
     } else {
@@ -268,7 +268,7 @@ int execute_pipig_two_processes(int count, char** arglist, int pipe_symbol) {
             /* second child */
             sigint_default_handler(); /*Foreground child terminate upon SIGINT*/
             close(pipefd[1]);  /* close write side */
-            my_dup2(pipefd, 0);
+            my_dup2(pipefd[0], 0);
             close(pipefd[0]);
             my_execvp(second_cmd);
         } else {
@@ -302,10 +302,10 @@ int execute_redirect_stdout_to_file(int count, char** arglist) {
     int fd;
     int exit_code = -1;
 
-    char* file_name = arglist[count-1];
+    file_name = arglist[count-1];
     arglist[count-2] = NULL;  /* ">" symbol change to NULL */
     
-    if ((fd = open(arglist[file_name], O_RDWR | O_CREAT , 00766)) == -1) {
+    if ((fd = open(file_name, O_RDWR | O_CREAT , 00766)) == -1) {
         perror("Failed executing open file");  /* failed opening file */
         return 0;
     }
@@ -340,7 +340,7 @@ int execute_cmd_regulary(int count, char** arglist) {
     if (pid == 0) {
         /* child process */
         sigint_default_handler(); /*Foreground child terminate upon SIGINT*/
-        my_execvp(count, arglist);
+        my_execvp(arglist);
     } else {
         /* parent process - waits for child process */
         if ((waitpid(pid, &exit_code, 0) == -1) && (errno != ECHILD)) {
