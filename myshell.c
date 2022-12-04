@@ -8,9 +8,11 @@
 #include <fcntl.h> 
 
 /* prototypes: */
+void sigchld_handler();
 pid_t my_fork();
 void my_execvp(char** arglist);
 int my_pipe(int[] pipefd);
+void my_dup2(int[] pipefd, int i);
 int fork_and_execute(int count, char** arglist);
 int execute_command_in_background(int count, char** arglist);
 int find_pipe_symbol(char** arglist);
@@ -45,6 +47,7 @@ int process_arglist(int count, char** arglist) {
 */
 int prepare(void) {
     signal(SIGINT, SIG_IGN);  /* After prepare() finishes, the parent (shell) should not terminate upon SIGINT */
+    sigchld_handler();
     return 0;
 }
 
@@ -58,6 +61,21 @@ int finalize(void) {
 
 
 /*--------------------UTILS-FUNCTIONS-----------------------*/
+
+/*
+* 
+*/
+void sigchld_handler() {
+    struct sigaction new_action;
+    
+    new_action->sa_handler = SIG_IGN;
+    new_action->sa_flags = SA_RESTART;
+    
+    if (sigaction(SIGCHLD, &new_action, NULL) == -1) {
+        perror("Failed executing sigaction");
+        exit(1);
+    }
+}
 
 /*
 * A function that forks process and checks for errors
@@ -97,6 +115,18 @@ int my_pipe(int[] pipefd) {
 }
 
 /*
+* A fiunction that execute dup2 and checks for errors
+*/
+void my_dup2(int[] pipefd, int i) {
+    int dup2_res = dup2(filedes[i], i);
+    
+    if(dup2_res == -1) {
+        perror("Failed executing dup2");
+        exit(1);
+    }
+}
+
+/*
 * A function to run shell command in the backgroud when "&" is the last arglist word.
 */
 int execute_command_in_background(int count, char** arglist) {
@@ -133,20 +163,51 @@ int find_pipe_symbol(char** arglist) {
 /*
 * A function that runs two child processes, with the output (stdout) of the 
 * first process piped to the input (stdin) of the second process 
-* 
+* helped here: 
+*   -> recitation4 code files
+*   -> https://stackoverflow.com/questions/3642732/using-dup2-for-piping
 */
 int execute_pipig_two_processes(int count, char** arglist, int pipe_symbol) {
     int pipefd[2];
-    pid_t cpid;
+    pid_t pid1;
+    pid_t pid2;
+    char** first_cmd = arglist;
+    char** second_cmd = arglist + pipe_symbol + 1;
     
     signal(SIGCHLD, SIG_IGN); /* ERAN'S TRICK for zombies */
     arglist[pipe_symbol] = NULL;
 
-    if (!my_pipe(pipefd)) {  /* my_pipe returns 0 when error accures */
-        return 0;
+    /* when error accures - my_pipe returns 0, my_fork returns -1 */
+    if (!my_pipe(pipefd) || (pid1 = my_fork()) < 0) { return 0; }
+
+    if (pid1 == 0) {
+        /* first child */
+        signal(SIGINT, SIG_DFL);
+        close(pipefd[0]);  /* close read side */
+        my_dup2(pipefd, 1);
+        close(pipefd[1]);
+        my_execvp(first_cmd);
+    } else {
+        /* parent */
+        signal(SIGINT, SIG_IGN);
+        if ((pid2 = my_fork()) < 0) { return 0; };  /* failed forking */
+
+        if (pid2 == 0) {
+            /* second child */
+            signal(SIGINT, SIG_DFL);
+            close(pipefd[1]);  /* close write side */
+            my_dup2(pipefd, 0);
+            close(pipefd[0]);
+            my_execvp(second_cmd);
+        } else {
+            close(pipefd[0]);
+            close(pipefd[1]);
+
+        }
+        
     }
 
-    
+
 
   }
 
