@@ -277,11 +277,11 @@ int execute_pipig_two_processes(int count, char** arglist, int pipe_symbol) {
             close(pipefd[1]);
 
             /* wait for child processes */
-            if ((waitpid(pid1, &exit_code, 0) == -1) && (errno != ECHILD)) {
+            if ((waitpid(pid1, &exit_code, 0) == -1) && (errno != ECHILD) && (errno != EINTR)) {
                 perror("Failed executing waitpid for first process in pipe");
                 return 0;
             }
-            if ((waitpid(pid2, &exit_code, 0) == -1) && (errno != ECHILD)) {
+            if ((waitpid(pid2, &exit_code, 0) == -1) && (errno != ECHILD) && (errno != EINTR)) {
                 perror("Failed executing waitpid for second process in pipe");
                 return 0;
             }
@@ -318,7 +318,7 @@ int execute_redirect_stdout_to_file(int count, char** arglist) {
         my_execvp(arglist);
     } else {
         /* parent process - waits for child process */
-        if ((waitpid(pid, &exit_code, 0) == -1) && (errno != ECHILD)) {
+        if ((waitpid(pid, &exit_code, 0) == -1) && (errno != ECHILD) && (errno != EINTR)) {
             perror("Failed executing waitpid for redirecting stdout to file");
             return 0;
         }
