@@ -49,7 +49,7 @@ int process_arglist(int count, char** arglist) {
         exec_result = execute_pipig_two_processes(count, arglist, pipe_symbol);
     }
     /* case redirating standart output to output file */
-    else if ((strcmp(arglist[count-2], ">")) == 0) {
+    else if ((count > 2) && (strcmp(arglist[count-2], ">")) == 0) {
         exec_result = execute_redirect_stdout_to_file(count, arglist);
     } 
     /* case of cmd without symbol - regular execution */
@@ -343,7 +343,7 @@ int execute_cmd_regulary(int count, char** arglist) {
         my_execvp(arglist);
     } else {
         /* parent process - waits for child process */
-        if ((waitpid(pid, &exit_code, 0) == -1) && (errno != ECHILD)) {
+        if ((waitpid(pid, &exit_code, 0) == -1) && (errno != ECHILD) && (errno != EINTR)) {
             perror("Failed executing waitpid for redirecting stdout to file");
             return 0;
         }
